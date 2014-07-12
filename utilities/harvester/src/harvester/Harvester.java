@@ -291,6 +291,10 @@ public class Harvester
 		{
 			continue;
 		}*/
+		/*if (dataset.id.startsWith("ABS_CENSUS2011_B"))
+		{
+			return;
+		}*/
 
 		System.out.println("Processing data for dataset '" + dataset.id + "'");
 
@@ -315,6 +319,20 @@ public class Harvester
 		//region is the last dimension in the cube:
 		Concept regionConcept = dataset.conceptMap.get(REGION_CONCEPT_ID);
 		combinationConcepts.add(regionConcept);
+
+		int sum = 1;
+		String conceptString = "";
+		for (Concept concept : combinationConcepts)
+		{
+			if (concept == regionConcept)
+			{
+				continue;
+			}
+			sum *= concept.codes.size();
+			conceptString += ", " + concept.id + "(" + concept.codes.size() + ")";
+		}
+		conceptString = conceptString.length() < 2 ? conceptString : conceptString.substring(2);
+		System.out.println("Found " + sum + " observation(s) per region, with concepts: " + conceptString);
 
 		Data rootData = new Data(combinationConcepts.get(0), null);
 
