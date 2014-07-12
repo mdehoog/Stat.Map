@@ -16,6 +16,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
@@ -33,6 +34,10 @@ public class Harvester
 {
 	private final static String LINE_SEPARATOR = System.getProperty("line.separator");
 	private final static boolean OVERWRITE_PROCESSED = false;
+	private final static String REGION_CONCEPT_ID = "REGION";
+	private final static String REGION_TYPE_CONCEPT_ID = "REGIONTYPE";
+	private final static String SA2_REGION_TYPE_CODE = "SA2";
+	private final static int PROCESSING_THREAD_COUNT = 5;
 
 	public static class Dataset
 	{
@@ -127,10 +132,6 @@ public class Harvester
 		File rootDir = new File("downloaded");
 		Writer errorWriter = new FileWriter(new File(rootDir, "errors.txt"));
 
-		String regionTypeConceptId = "REGIONTYPE";
-		String sa2RegionTypeCode = "SA2";
-		String regionConceptId = "REGION";
-
 		System.out.println("Loading datasets");
 
 		File datasetFile = new File(rootDir, "datasetList.json");
@@ -152,16 +153,16 @@ public class Harvester
 				continue;
 			}
 			boolean regionTypeCorrect = false;
-			if (concepts.contains(regionTypeConceptId) && concepts.contains(regionConceptId))
+			if (concepts.contains(REGION_TYPE_CONCEPT_ID) && concepts.contains(REGION_CONCEPT_ID))
 			{
-				File codeListFile = codeListFile(rootDir, datasetId, regionTypeConceptId);
-				JSONObject regionTypesJson = downloadCodeListValue(datasetId, regionTypeConceptId, codeListFile);
+				File codeListFile = codeListFile(rootDir, datasetId, REGION_TYPE_CONCEPT_ID);
+				JSONObject regionTypesJson = downloadCodeListValue(datasetId, REGION_TYPE_CONCEPT_ID, codeListFile);
 				JSONArray codes = (JSONArray) regionTypesJson.get("codes");
 				for (int j = 0; j < codes.size(); j++)
 				{
 					JSONObject code = (JSONObject) codes.get(j);
 					String codeId = (String) code.get("code");
-					if (sa2RegionTypeCode.equals(codeId))
+					if (SA2_REGION_TYPE_CODE.equals(codeId))
 					{
 						regionTypeCorrect = true;
 						break;
@@ -219,170 +220,222 @@ public class Harvester
 			}
 		}
 
-		for (Dataset dataset : datasets)
+		List<Thread> threads = new ArrayList<>();
+		final AtomicInteger datasetIndex = new AtomicInteger(0);
+		for (int t = 0; t < PROCESSING_THREAD_COUNT; t++)
 		{
-			File processedDirectory = new File(rootDir, "processed/" + dataset.id);
-			File summaryFile = new File(processedDirectory, "summary.json");
-			
-			if(summaryFile.exists() && !OVERWRITE_PROCESSED)
+			Thread thread = new Thread(new Runnable()
 			{
-				continue;
-			}
-			
-			/*if (!"ABS_NRP9_ASGS".equals(dataset.id))
-			{
-				continue;
-			}*/
-
-			System.out.println("Processing data for dataset '" + dataset.id + "'");
-
-			List<Concept> combinationConcepts = new ArrayList<>();
-			Set<Concept> ignoredConcepts = new HashSet<>();
-			for (Concept concept : dataset.concepts)
-			{
-				if (regionConceptId.equals(concept.id))
+				@Override
+				public void run()
 				{
-					continue;
-				}
-				else if (regionTypeConceptId.equals(concept.id) || "STATE".equals(concept.id)
-						|| "FREQUENCY".equals(concept.id))
-				{
-					ignoredConcepts.add(concept);
-				}
-				else
-				{
-					combinationConcepts.add(concept);
-				}
-			}
-			//region is the last dimension in the cube:
-			Concept regionConcept = dataset.conceptMap.get(regionConceptId);
-			combinationConcepts.add(regionConcept);
-
-			Data rootData = new Data(combinationConcepts.get(0), null);
-
-			//5 levels to download:
-			//AUS: http://stat.abs.gov.au/itt/query.jsp?method=GetGenericData&datasetid=ABS_NRP9_ASGS&and=REGION.0
-			//STE: http://stat.abs.gov.au/itt/query.jsp?method=GetGenericData&datasetid=ABS_NRP9_ASGS&and=REGIONTYPE.STE&orParent=REGION.0
-			//SA4: http://stat.abs.gov.au/itt/query.jsp?method=GetGenericData&datasetid=ABS_NRP9_ASGS&and=REGIONTYPE.SA4&orParent=REGION.1
-			//SA3: http://stat.abs.gov.au/itt/query.jsp?method=GetGenericData&datasetid=ABS_NRP9_ASGS&and=REGIONTYPE.SA3&orParent=REGION.101
-			//SA2: http://stat.abs.gov.au/itt/query.jsp?method=GetGenericData&datasetid=ABS_NRP9_ASGS&and=REGIONTYPE.SA2&orParent=REGION.10101
-
-			String[] regionTypes = { "AUS", "STE", "SA4", "SA3", "SA2" };
-			int[] orParentLevels = { -1, 0, 1, 2, 3 };
-			Code parentRegionCode = regionConcept.allCodesMap.get("0");
-			for (int level = 0; level < 5; level++)
-			{
-				String regionType = regionTypes[level];
-				List<Code> codes = new ArrayList<>();
-				if (level == 0)
-				{
-					codes.add(parentRegionCode);
-				}
-				else
-				{
-					addCodeChildrenToListAtLevel0(parentRegionCode, codes, orParentLevels[level]);
-				}
-
-				for (Code code : codes)
-				{
-					String url = "http://stat.abs.gov.au/itt/query.jsp?method=GetGenericData&datasetid=" + dataset.id;
-					url += level == 0 ? ("&and=REGION.0")
-							: ("&and=REGIONTYPE." + regionType + "&orParent=REGION." + code.id);
-					File file = new File(rootDir, "data/" + dataset.id + "/" + regionType + "/"
-							+ (level == 0 ? "" : "parent") + code.id + ".json");
-
-					JSONObject data = null;
-					JSONArray series = null;
-					int retries = 5;
-					for (int retry = 0; retry < retries; retry++)
+					while (true)
 					{
-						if (retry > 0)
+						int index = datasetIndex.getAndIncrement();
+						if (index >= datasets.size())
 						{
-							System.out.println("Downloading from " + url + " failed, retrying (attempt " + (retry + 1)
-									+ "/" + retries + ")");
+							break;
 						}
+						Dataset dataset = datasets.get(index);
 						try
 						{
-							data = downloadJSONObject(new URL(url), file);
-							series = (JSONArray) data.get("series");
-							if (series != null)
-							{
-								break;
-							}
+							processDataset(dataset, rootDir, errorWriter);
 						}
 						catch (Exception e)
 						{
-						}
-						file.delete();
-					}
-					if (series == null)
-					{
-						String message = "Error downloading from " + url + ", data = " + data;
-						System.err.println(message);
-						errorWriter.write(dataset.id + ": " + message + LINE_SEPARATOR);
-						errorWriter.flush();
-						//try next URL (we can always rerun)
-						continue;
-					}
-					//assertTrue(series != null, "Error downloading from " + url);
-
-					for (int i = 0; i < series.size(); i++)
-					{
-						JSONObject serie = (JSONObject) series.get(i);
-						JSONArray conceptsArray = (JSONArray) serie.get("concepts");
-						Map<Concept, Code> codesFromCombinations = new HashMap<>();
-						for (int j = 0; j < conceptsArray.size(); j++)
-						{
-							JSONObject conceptJson = (JSONObject) conceptsArray.get(j);
-							String conceptName = (String) conceptJson.get("name");
-							String conceptValue = (String) conceptJson.get("Value");
-							Concept concept = dataset.conceptMap.get(conceptName);
-							assertTrue(concept != null, "Unknown concept returned in data: " + conceptName);
-							if (ignoredConcepts.contains(concept))
+							try
 							{
-								continue;
+								errorWriter.write("Error processing dataset " + dataset.id + ": "
+										+ e.getLocalizedMessage());
+								errorWriter.flush();
 							}
-							assertTrue(!codesFromCombinations.containsKey(concept), "A value for concept '"
-									+ conceptName + "' has already been defined for this data");
-							Code conceptCode = concept.allCodesMap.get(conceptValue);
-							assertTrue(code != null, "Unknown concept code returned in data '" + conceptValue
-									+ "' for concept '" + conceptName + "'");
-							concept.usedCodes.add(conceptCode);
-							codesFromCombinations.put(concept, conceptCode);
+							catch (IOException e1)
+							{
+								e1.printStackTrace();
+							}
 						}
-
-						assertTrue(codesFromCombinations.keySet().containsAll(combinationConcepts),
-								"Not all concepts from the combination were included in the data");
-
-						DataValues values = new DataValues();
-						JSONArray observationsArray = (JSONArray) serie.get("observations");
-						for (int j = 0; j < observationsArray.size(); j++)
-						{
-							JSONObject observationJson = (JSONObject) observationsArray.get(j);
-							String observationTime = (String) observationJson.get("Time");
-							String observationValue = (String) observationJson.get("Value");
-
-							assertTrue(!values.values.containsKey(observationTime), "Value for time '"
-									+ observationTime + "' has already been added");
-
-							values.times.add(observationTime);
-							values.values.put(observationTime, observationValue);
-						}
-
-						insertData(combinationConcepts, 0, codesFromCombinations, rootData, values);
 					}
 				}
+			});
+			thread.start();
+			threads.add(thread);
+		}
+
+		for (Thread thread : threads)
+		{
+			try
+			{
+				thread.join();
 			}
-
-			System.out.println("Saving processed data for dataset '" + dataset.id + "'");
-
-			saveData(rootData, processedDirectory, combinationConcepts.get(combinationConcepts.size() - 1));
-			saveSummary(dataset, summaryFile, combinationConcepts);
+			catch (InterruptedException e)
+			{
+			}
 		}
 
 		errorWriter.close();
 
 		System.out.println("Done");
+	}
+
+	private static void processDataset(Dataset dataset, File rootDir, Writer errorWriter) throws IOException
+	{
+		File processedDirectory = new File(rootDir, "processed/" + dataset.id);
+		File summaryFile = new File(processedDirectory, "summary.json");
+
+		if (summaryFile.exists() && !OVERWRITE_PROCESSED)
+		{
+			return;
+		}
+
+		/*if (!"ABS_NRP9_ASGS".equals(dataset.id))
+		{
+			continue;
+		}*/
+
+		System.out.println("Processing data for dataset '" + dataset.id + "'");
+
+		List<Concept> combinationConcepts = new ArrayList<>();
+		Set<Concept> ignoredConcepts = new HashSet<>();
+		for (Concept concept : dataset.concepts)
+		{
+			if (REGION_CONCEPT_ID.equals(concept.id))
+			{
+				continue;
+			}
+			else if (REGION_TYPE_CONCEPT_ID.equals(concept.id) || "STATE".equals(concept.id)
+					|| "FREQUENCY".equals(concept.id))
+			{
+				ignoredConcepts.add(concept);
+			}
+			else
+			{
+				combinationConcepts.add(concept);
+			}
+		}
+		//region is the last dimension in the cube:
+		Concept regionConcept = dataset.conceptMap.get(REGION_CONCEPT_ID);
+		combinationConcepts.add(regionConcept);
+
+		Data rootData = new Data(combinationConcepts.get(0), null);
+
+		//5 levels to download:
+		//AUS: http://stat.abs.gov.au/itt/query.jsp?method=GetGenericData&datasetid=ABS_NRP9_ASGS&and=REGION.0
+		//STE: http://stat.abs.gov.au/itt/query.jsp?method=GetGenericData&datasetid=ABS_NRP9_ASGS&and=REGIONTYPE.STE&orParent=REGION.0
+		//SA4: http://stat.abs.gov.au/itt/query.jsp?method=GetGenericData&datasetid=ABS_NRP9_ASGS&and=REGIONTYPE.SA4&orParent=REGION.1
+		//SA3: http://stat.abs.gov.au/itt/query.jsp?method=GetGenericData&datasetid=ABS_NRP9_ASGS&and=REGIONTYPE.SA3&orParent=REGION.101
+		//SA2: http://stat.abs.gov.au/itt/query.jsp?method=GetGenericData&datasetid=ABS_NRP9_ASGS&and=REGIONTYPE.SA2&orParent=REGION.10101
+
+		String[] regionTypes = { "AUS", "STE", "SA4", "SA3", "SA2" };
+		int[] orParentLevels = { -1, 0, 1, 2, 3 };
+		Code parentRegionCode = regionConcept.allCodesMap.get("0");
+		for (int level = 0; level < 5; level++)
+		{
+			String regionType = regionTypes[level];
+			List<Code> codes = new ArrayList<>();
+			if (level == 0)
+			{
+				codes.add(parentRegionCode);
+			}
+			else
+			{
+				addCodeChildrenToListAtLevel0(parentRegionCode, codes, orParentLevels[level]);
+			}
+
+			for (Code code : codes)
+			{
+				String url = "http://stat.abs.gov.au/itt/query.jsp?method=GetGenericData&datasetid=" + dataset.id;
+				url += level == 0 ? ("&and=REGION.0")
+						: ("&and=REGIONTYPE." + regionType + "&orParent=REGION." + code.id);
+				File file = new File(rootDir, "data/" + dataset.id + "/" + regionType + "/"
+						+ (level == 0 ? "" : "parent") + code.id + ".json");
+
+				JSONObject data = null;
+				JSONArray series = null;
+				int retries = 5;
+				for (int retry = 0; retry < retries; retry++)
+				{
+					if (retry > 0)
+					{
+						System.out.println("Downloading from " + url + " failed, retrying (attempt " + (retry + 1)
+								+ "/" + retries + ")");
+					}
+					try
+					{
+						data = downloadJSONObject(new URL(url), file);
+						series = (JSONArray) data.get("series");
+						if (series != null)
+						{
+							break;
+						}
+					}
+					catch (Exception e)
+					{
+					}
+					file.delete();
+				}
+				if (series == null)
+				{
+					String message = "Error downloading from " + url + ", data = " + data;
+					System.err.println(message);
+					errorWriter.write(dataset.id + ": " + message + LINE_SEPARATOR);
+					errorWriter.flush();
+					//try next URL (we can always rerun)
+					continue;
+				}
+				//assertTrue(series != null, "Error downloading from " + url);
+
+				for (int i = 0; i < series.size(); i++)
+				{
+					JSONObject serie = (JSONObject) series.get(i);
+					JSONArray conceptsArray = (JSONArray) serie.get("concepts");
+					Map<Concept, Code> codesFromCombinations = new HashMap<>();
+					for (int j = 0; j < conceptsArray.size(); j++)
+					{
+						JSONObject conceptJson = (JSONObject) conceptsArray.get(j);
+						String conceptName = (String) conceptJson.get("name");
+						String conceptValue = (String) conceptJson.get("Value");
+						Concept concept = dataset.conceptMap.get(conceptName);
+						assertTrue(concept != null, "Unknown concept returned in data: " + conceptName);
+						if (ignoredConcepts.contains(concept))
+						{
+							continue;
+						}
+						assertTrue(!codesFromCombinations.containsKey(concept), "A value for concept '" + conceptName
+								+ "' has already been defined for this data");
+						Code conceptCode = concept.allCodesMap.get(conceptValue);
+						assertTrue(code != null, "Unknown concept code returned in data '" + conceptValue
+								+ "' for concept '" + conceptName + "'");
+						concept.usedCodes.add(conceptCode);
+						codesFromCombinations.put(concept, conceptCode);
+					}
+
+					assertTrue(codesFromCombinations.keySet().containsAll(combinationConcepts),
+							"Not all concepts from the combination were included in the data");
+
+					DataValues values = new DataValues();
+					JSONArray observationsArray = (JSONArray) serie.get("observations");
+					for (int j = 0; j < observationsArray.size(); j++)
+					{
+						JSONObject observationJson = (JSONObject) observationsArray.get(j);
+						String observationTime = (String) observationJson.get("Time");
+						String observationValue = (String) observationJson.get("Value");
+
+						assertTrue(!values.values.containsKey(observationTime), "Value for time '" + observationTime
+								+ "' has already been added");
+
+						values.times.add(observationTime);
+						values.values.put(observationTime, observationValue);
+					}
+
+					insertData(combinationConcepts, 0, codesFromCombinations, rootData, values);
+				}
+			}
+		}
+
+		System.out.println("Saving processed data for dataset '" + dataset.id + "'");
+
+		saveData(rootData, processedDirectory, combinationConcepts.get(combinationConcepts.size() - 1));
+		saveSummary(dataset, summaryFile, combinationConcepts);
 	}
 
 	private static void assertTrue(boolean value, String message)
