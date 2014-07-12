@@ -32,6 +32,7 @@ import org.json.simple.parser.ParseException;
 public class Harvester
 {
 	private final static String LINE_SEPARATOR = System.getProperty("line.separator");
+	private final static boolean OVERWRITE_PROCESSED = false;
 
 	public static class Dataset
 	{
@@ -220,6 +221,14 @@ public class Harvester
 
 		for (Dataset dataset : datasets)
 		{
+			File processedDirectory = new File(rootDir, "processed/" + dataset.id);
+			File summaryFile = new File(processedDirectory, "summary.json");
+			
+			if(summaryFile.exists() && !OVERWRITE_PROCESSED)
+			{
+				continue;
+			}
+			
 			/*if (!"ABS_NRP9_ASGS".equals(dataset.id))
 			{
 				continue;
@@ -367,10 +376,7 @@ public class Harvester
 
 			System.out.println("Saving processed data for dataset '" + dataset.id + "'");
 
-			File processedDirectory = new File(rootDir, "processed/" + dataset.id);
 			saveData(rootData, processedDirectory, combinationConcepts.get(combinationConcepts.size() - 1));
-
-			File summaryFile = new File(processedDirectory, "summary.json");
 			saveSummary(dataset, summaryFile, combinationConcepts);
 		}
 
