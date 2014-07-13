@@ -5,3 +5,14 @@
 </p>
 
 Mashup of ABS.Stat and Cesium for GovHack 2014.
+
+### Preview ###
+
+You can view a demo on GitHub pages:
+http://mdehoog.github.io/Stat.Map/
+
+Works best in Google Chrome!
+
+### License ###
+
+[MIT](http://opensource.org/licenses/MIT).  Free for both commercial and non-commercial use.
