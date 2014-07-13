@@ -123,4 +123,6 @@
 		</sync>
 	</target>
 	
+	<target name="test" depends="build" />
+	
 </project>
