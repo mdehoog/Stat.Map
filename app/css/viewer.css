@@ -36,16 +36,28 @@ body {
     background-image: url(../img/ajax-loader.gif);
 }
 
-#datasetSelect {
+#logo {
     display: block;
     position: absolute;
     top: 10px;
     left: 10px;
 }
 
+#datasetSelect {
+    display: block;
+    position: absolute;
+    top: 6px;
+    left: 200px;
+    max-width: 500px;
+    background-color: black;
+    color: white;
+}
+
 #regionTypeSelect {
     display: block;
     position: absolute;
-    top: 40px;
-    left: 10px;
+    top: 32px;
+    left: 200px;
+    background-color: black;
+    color: white;
 }
