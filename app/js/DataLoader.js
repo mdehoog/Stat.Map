@@ -154,6 +154,12 @@ define([
         this._desiredBoundaryLevel = level;
     }
 
+	var boundaryAppearance = new BoundaryAppearance({
+		translucent: false,
+		closed: false,
+		flat: false
+	});
+
     DataLoader.prototype.refreshBoundaries = function() {
         var level = this._desiredBoundaryLevel;
         if(this._boundaryLevel == level) {
@@ -194,11 +200,7 @@ define([
 
         var primitive = new Primitive({
             geometryInstances: instances,
-            appearance: new BoundaryAppearance({
-                translucent: false,
-                closed: false,
-                flat: false
-            }),
+            appearance: boundaryAppearance,
             releaseGeometryInstances: true,
             interleave: true
         });
