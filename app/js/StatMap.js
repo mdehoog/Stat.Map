@@ -64,7 +64,6 @@ define([
 	 * 'theme'  : 'lighter',    // Use the dark-text-on-light-background theme.
 	 */
 	var endUserOptions = {
-		'theme': 'lighter',
 		'stats': false,
 		'inspector': false,
 		'debug': false
