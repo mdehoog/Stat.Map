@@ -1,1 +1,10 @@
+branches:
+  only:
+  - master
 language: java
+after_success:
+- chmod +x .travis/push-build-to-gh-pages.sh
+- .travis/push-build-to-gh-pages.sh
+env:
+  global:
+    secure: RTDMbVtrCbAZValgqKwxso3jWT0wcuHD4cUsf90Q61AgSheCSBXBg4tPYEwqiTnAaZ3ALo9hnAMMyMgujoe+X+jR3poZvBOb/qBdgTluVOKea1uybwFIwAHszqFmsWpfZfXnU2MReVuwzbeF8XLai/zo6D8sqruc8JKzvJtZ06Q=
