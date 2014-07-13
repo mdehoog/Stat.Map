@@ -1,0 +1,126 @@
+<project name="Stat.Map" default="build">
+
+	<property name="buildDirectory" location="build" />
+	<property name="appDirectory" location="app" />
+	<property name="appOutputDirectory" location="${buildDirectory}/app" />
+	
+	<property name="cesiumDirectory" location="Cesium/Cesium" />
+	<property name="cesiumSourceDirectory" location="Cesium/Source" />
+	<property name="cesiumToolsDirectory" location="Cesium/Tools" />
+	<property name="cesiumThirdPartyDirectory" location="Cesium/ThirdParty" />
+	
+	<property name="requirejsPath" location="${cesiumThirdPartyDirectory}/requirejs-2.1.9" />
+	<property name="rjsPath" location="${requirejsPath}/r.js" />
+	<property name="rjsOptions" location="${cesiumToolsDirectory}/build.js" />
+	<property name="pragmas.debug" value="false" />
+	<property name="optimize" value="uglify2" />
+	
+	<target name="clean">
+		<delete dir="${appOutputDirectory}"/>
+	</target>
+
+	<target name="checkForNode">
+		<exec executable="node" failonerror="false" failifexecutionfails="false" resultproperty="node.exec.result">
+			<arg value="--version" />
+		</exec>
+		<fail message="Node.js is required to run this part of the build.  Install from http://nodejs.org/">
+			<condition>
+				<not>
+					<equals arg1="${node.exec.result}" arg2="0" />
+				</not>
+			</condition>
+		</fail>
+	</target>
+	
+	<target name="buildCustomWorkers" depends="checkForNode">
+		<mkdir dir="${appOutputDirectory}" />
+		<apply executable="node" dir="${cesiumSourceDirectory}" relative="true" force="true">
+			<arg value="${rjsPath}" />
+			<arg value="-o" />
+			<arg value="${rjsOptions}" />
+			<arg value="optimize=${optimize}" />
+			<arg value="pragmas.debug=${pragmas.debug}" />
+			<arg value="baseUrl=." />
+
+			<srcfile prefix="name=Workers/" />
+			<targetfile prefix="out=" />
+			<globmapper from="*" to="${appOutputDirectory}/Workers/*.js" />
+			<mappedresources>
+				<fileset dir="${cesiumSourceDirectory}/Workers">
+					<include name="createBoundary*.js" />
+				</fileset>
+				<chainedmapper>
+					<flattenmapper />
+					<globmapper from="*.js" to="*" />
+				</chainedmapper>
+			</mappedresources>
+		</apply>
+	</target>
+	
+	<target name="build" depends="buildCustomWorkers">
+		<mkdir dir="${appOutputDirectory}" />
+		<property name="relativeappOutputDirectory" location="${appOutputDirectory}" relative="true" basedir="${appDirectory}" />
+
+		<!-- mainConfigFile is relative to the build.js file -->
+		<exec executable="node" dir="${appDirectory}">
+			<arg value="${rjsPath}" />
+			<arg value="-o" />
+			<arg value="${rjsOptions}" />
+			<arg value="optimize=${optimize}" />
+			<arg value="pragmas.debug=${pragmas.debug}" />
+			<arg value="mainConfigFile=../../app/js/app.js" />
+			<arg value="name=../../app/js/app" />
+			<arg value="out=${relativeappOutputDirectory}/js/app.js" />
+		</exec>
+
+		<exec executable="node" dir="${appDirectory}">
+			<arg value="${rjsPath}" />
+			<arg value="-o" />
+			<arg value="${rjsOptions}" />
+			<arg value="cssIn=css/viewer.css" />
+			<arg value="out=${relativeappOutputDirectory}/css/viewer.css" />
+		</exec>
+
+		<!-- Copy other app files -->
+		<copy todir="${appOutputDirectory}">
+			<fileset dir="${appDirectory}">
+				<exclude name="js/*.js" />
+				<exclude name="css/*.css" />
+			</fileset>
+		</copy>
+
+		<!-- Copy RequireJS -->
+		<copy file="${requirejsPath}/require.min.js" tofile="${appOutputDirectory}/require.js" />
+
+		<!-- Copy the built Cesium assets and workers -->
+		<copy todir="${appOutputDirectory}">
+			<fileset dir="${cesiumDirectory}" excludes="Cesium.js" />
+		</copy>
+
+		<!-- rewrite the paths in the configuration -->
+		<replace dir="${appOutputDirectory}" summary="true">
+			<replacefilter token="../../Cesium/Source" value="." />
+			<replacefilter token="../ThirdParty/requirejs-2.1.9" value="." />
+			<replacefilter token="../../app/js/StatMap" value="../app/js/StatMap" />
+			<include name="js/app.js" />
+		</replace>
+
+		<!-- rewrite the paths in the HTML -->
+		<replace dir="${appOutputDirectory}" summary="true">
+			<replacefilter token="../Cesium/ThirdParty/requirejs-2.1.9" value="." />
+			<include name="index.html" />
+		</replace>
+
+		<!-- rewrite the paths in the CSS -->
+		<replace dir="${appOutputDirectory}" summary="true">
+			<replacefilter token="../../Cesium/Source/" value="" />
+			<include name="*.css" />
+		</replace>
+
+		<!-- sync custom workers from source Cesium -->
+		<sync todir="${appOutputDirectory}/Workers">
+			<fileset dir="${cesiumSourceDirectory}/Workers"/>
+		</sync>
+	</target>
+	
+</project>
