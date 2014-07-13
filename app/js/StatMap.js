@@ -218,6 +218,7 @@ define([
             loadDataset(url);
         };
         datasetSelection.selectedIndex = 0;
+        datasetSelection.onchange();
     }).otherwise(function(error) {
         var errorOption = document.createElement('option');
         errorOption.text = 'Error loading data: ' + error;
