@@ -42,3 +42,10 @@ body {
     top: 10px;
     left: 10px;
 }
+
+#regionTypeSelect {
+    display: block;
+    position: absolute;
+    top: 40px;
+    left: 10px;
+}

@@ -46,6 +46,9 @@ define([
         this._geometries = {};
         this._statistics = {};
         this._error = new Event();
+        this._statisticsDirty = false;
+        this._boundaryLevel = -1;
+        this._desiredBoundaryLevel = 0;
     };
 
     defineProperties(DataLoader.prototype, {
@@ -140,51 +143,70 @@ define([
                 });
             }
             that.geometries[level] = geometries;
-
-
-            if(level == 2) {
-                var instances = [];
-
-                for (var i = 0; i < geometries.length; i++) {
-                    var geometry = geometries[i];
-                    var instance = new GeometryInstance({
-                        id: geometry.id,
-                        //geometry: geometry.geometry,
-                        geometry : GeometryPipeline.toWireframe(geometry.geometry),
-                        modelMatrix: Matrix4.IDENTITY,
-                        attributes: {
-                            color: ColorGeometryInstanceAttribute.fromColor(Color.WHITE),
-                            height: new GeometryInstanceAttribute({
-                                componentDatatype: ComponentDatatype.FLOAT,
-                                componentsPerAttribute: 1,
-                                normalize: false,
-                                value: [0]
-                            })//,
-                            //show: new ShowGeometryInstanceAttribute(false)
-                        }
-                    });
-                    instances.push(instance);
-                }
-
-                var primitive = new Primitive({
-                    geometryInstances: instances,
-                    appearance: new BoundaryAppearance({
-                        translucent: false,
-                        closed: false,
-                        flat: false
-                    }),
-                    releaseGeometryInstances: true,
-                    interleave: true
-                });
-                that.scene.primitives.add(primitive);
-                that._primitive = primitive;
-            }
         }).otherwise(function (error) {
             //viewer.cesiumWidget.showErrorPanel(error, '');
             //throw new Cesium.DeveloperError(error);
             console.log(error);
         });
     };
+
+    DataLoader.prototype.loadBoundariesAtLevel = function(level) {
+        this._desiredBoundaryLevel = level;
+    }
+
+    DataLoader.prototype.refreshBoundaries = function() {
+        var level = this._desiredBoundaryLevel;
+        if(this._boundaryLevel == level) {
+            return;
+        }
+
+        var geometries = this.geometries[level];
+        if(!defined(geometries)) {
+            return;
+        }
+
+        if(defined(this._primitive)) {
+            this.scene.primitives.remove(this._primitive);
+            this._primitive = undefined;
+        }
+
+        var instances = [];
+        for (var i = 0; i < geometries.length; i++) {
+            var geometry = geometries[i];
+            var instance = new GeometryInstance({
+                id: geometry.id,
+                //geometry: geometry.geometry,
+                geometry : GeometryPipeline.toWireframe(geometry.geometry),
+                modelMatrix: Matrix4.IDENTITY,
+                attributes: {
+                    color: ColorGeometryInstanceAttribute.fromColor(Color.WHITE),
+                    height: new GeometryInstanceAttribute({
+                        componentDatatype: ComponentDatatype.FLOAT,
+                        componentsPerAttribute: 1,
+                        normalize: false,
+                        value: [0]
+                    })//,
+                    //show: new ShowGeometryInstanceAttribute(false)
+                }
+            });
+            instances.push(instance);
+        }
+
+        var primitive = new Primitive({
+            geometryInstances: instances,
+            appearance: new BoundaryAppearance({
+                translucent: false,
+                closed: false,
+                flat: false
+            }),
+            releaseGeometryInstances: true,
+            interleave: true
+        });
+        this.scene.primitives.add(primitive);
+        this._primitive = primitive;
+        this._statisticsDirty = true;
+        this._boundaryLevel = level;
+    }
 
     DataLoader.prototype.loadStatistics = function(url, completedCallback) {
         var that = this;
@@ -257,6 +279,7 @@ define([
     };
 
     DataLoader.prototype.update = function(clock) {
+        this.refreshBoundaries();
         this.refreshStatistics();
     };
 
