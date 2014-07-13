@@ -181,8 +181,8 @@ define([
             var geometry = geometries[i];
             var instance = new GeometryInstance({
                 id: geometry.id,
-                //geometry: geometry.geometry,
-                geometry : GeometryPipeline.toWireframe(geometry.geometry),
+                geometry: geometry.geometry,
+                //geometry : GeometryPipeline.toWireframe(geometry.geometry),
                 modelMatrix: Matrix4.IDENTITY,
                 attributes: {
                     color: ColorGeometryInstanceAttribute.fromColor(Color.WHITE),
@@ -191,8 +191,7 @@ define([
                         componentsPerAttribute: 1,
                         normalize: false,
                         value: [0]
-                    })//,
-                    //show: new ShowGeometryInstanceAttribute(false)
+                    })
                 }
             });
             instances.push(instance);
@@ -267,7 +266,6 @@ define([
             var primitiveId = primitiveIds[i];
             var attributes = primitive.getGeometryInstanceAttributes(primitiveId);
             if(defined(attributes)) {
-                //attributes.show = [value != null];
                 attributes.height = [valueNormalized];
                 var color = value == null ? Color.WHITE : Color.fromHsl((1.0 - valueNormalized) * 0.6666, 1.0, 0.5);
                 attributes.color = new Uint8Array([
