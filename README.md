@@ -4,7 +4,7 @@
 <img src="https://raw.githubusercontent.com/mdehoog/Stat.Map/master/logo/logo.png" width="50%" />
 </p>
 
-Mashup of ABS.Stat and Cesium for GovHack 2014.
+Mashup of [ABS.Stat](http://stat.abs.gov.au/) and [Cesium](http://cesiumjs.org) for GovHack Australia 2014.
 
 ### Preview ###
 
