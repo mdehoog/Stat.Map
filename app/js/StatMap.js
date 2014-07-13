@@ -19,6 +19,7 @@ define([
 	'Core/Math',
     'Core/Matrix4',
     'Core/Ellipsoid',
+	'Core/Credit',
     'Scene/SceneMode',
     'Scene/Camera',
     'StatMap/resetFlyHome',
@@ -45,6 +46,7 @@ define([
 			 CesiumMath,
              Matrix4,
              Ellipsoid,
+			 Credit,
              SceneMode,
              Camera,
              resetFlyHome,
@@ -167,6 +169,11 @@ define([
             //TODO do something with the picked ASGS (like show a popup/tooltip)
         }
     }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+
+
+	//add credits
+	scene.frameState.creditDisplay.addDefaultCredit(new Credit('ABS', 'img/abs_credit.png', 'http://stat.abs.gov.au/'));
+	scene.frameState.creditDisplay.addDefaultCredit(new Credit('GovHack', 'img/govhack_credit.png', 'http://govhack.org/'));
 
 
     //load region topojson files
