@@ -1,0 +1,6 @@
+font: century oldstyle
+font size: 230
+BETA font size (bold): 46 (5x smaller)
+width: 1000
+height ratio: 112%
+when black on white: 1x dilate (but don't dilate BETA)
