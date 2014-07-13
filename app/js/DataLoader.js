@@ -71,14 +71,15 @@ define([
         }
     });
 
-    DataLoader.prototype.loadBoundaries = function(url, level) {
+    DataLoader.prototype.loadBoundaries = function(url, level, completedCallback) {
         var dataSource = new GeoJsonDataSourceWithHoles();
         var loadPromise = dataSource.loadUrl(url);
         var that = this;
         loadPromise.then(function () {
 
-            //clean up dynamic objects created by the data source so that it's cloneable by the web worker
+            completedCallback();
 
+            //clean up dynamic objects created by the data source so that it's cloneable by the web worker
             var objectIds = [];
             var objectIdSet = {};
             var objects = dataSource.dynamicObjects._objects._array;
@@ -185,9 +186,10 @@ define([
         });
     };
 
-    DataLoader.prototype.loadStatistics = function(url) {
+    DataLoader.prototype.loadStatistics = function(url, completedCallback) {
         var that = this;
         return when(loadJson(url), function(json) {
+            completedCallback();
             return that.loadStatisticsJson(json);
         }).otherwise(function(error) {
             that._error.raiseEvent(dataSource, error);
