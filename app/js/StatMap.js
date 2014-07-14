@@ -3,6 +3,7 @@ define([
     'Core/defined',
     'Core/formatError',
     'Core/getFilenameFromUri',
+	'Core/GeographicTilingScheme',
     'DynamicScene/CzmlDataSource',
     'DynamicScene/GeoJsonDataSource',
     'Scene/TileMapServiceImageryProvider',
@@ -14,6 +15,7 @@ define([
     'StatMap/UnprojectedGeoJsonDataSource',
 	'StatMap/BoundaryGeometry',
 	'StatMap/BoundaryAppearance',
+	'StatMap/CustomTileMapServiceImageryProvider',
 	'Cesium',
 	'Core/Cartesian3',
 	'Core/Math',
@@ -30,6 +32,7 @@ define([
 ], function (defined,
              formatError,
              getFilenameFromUri,
+			 GeographicTilingScheme,
              CzmlDataSource,
              GeoJsonDataSource,
              TileMapServiceImageryProvider,
@@ -41,6 +44,7 @@ define([
              UnprojectedGeoJsonDataSource,
 			 BoundaryGeometry,
 			 BoundaryAppearance,
+			 CustomTileMapServiceImageryProvider,
 			 Cesium,
 			 Cartesian3,
 			 CesiumMath,
@@ -91,16 +95,50 @@ define([
 		});
 	}*/
 
+	var gaImageryProvider = new CustomTileMapServiceImageryProvider({
+		url: 'http://www.ga.gov.au/apps/world-wind/tiles.jsp?T=terrain/ausbath09_nw',
+		rectangle: new Cesium.Rectangle(
+			Cesium.Math.toRadians(91.9987499999936),
+			Cesium.Math.toRadians(-59.998749998960086),
+			Cesium.Math.toRadians(171.99874999992056),
+			Cesium.Math.toRadians(-7.998749999007571)),
+		tilingScheme: new GeographicTilingScheme({
+			numberOfLevelZeroTilesX: 9,
+			numberOfLevelZeroTilesY: 4,
+			rectangle: new Cesium.Rectangle(
+				Cesium.Math.toRadians(-180.0),
+				Cesium.Math.toRadians(-90.0),
+				Cesium.Math.toRadians(180.0),
+				Cesium.Math.toRadians(70))
+			//a value of:
+			// 9 (-180 to 180) and 4 (-90 to 70)
+			//is the same as world wind's value of:
+			// 9 (-180 to 180) and 4.5 (-90 to 90)
+			//(ie: a level zero tile size of 40 degrees)
+		}),
+		maximumLevel: 5,
+		fileExtension: 'jpg',
+		tileWidth: 512,
+		tileHeight: 512,
+		urlBuilder: function (imageryProvider, x, y, level) {
+			var yTiles = imageryProvider._tilingScheme.getNumberOfYTilesAtLevel(level);
+			var url = imageryProvider._url + '&L=' + level + '&X=' + x + '&Y=' + (yTiles - y - 1) + '&F=' + imageryProvider._fileExtension;
+			var proxy = imageryProvider._proxy;
+			if (defined(proxy)) {
+				url = proxy.getURL(url);
+			}
+			return url;
+		},
+		loadXML: false
+	});
+
 	var viewer;
 	try {
 		viewer = new Viewer('cesiumContainer', {
-            /*imageryProvider: new Cesium.WebMapServiceImageryProvider({
-                url: 'http://www.ga.gov.au/gis/services/marine_coastal/Australian_Bathymetry_Topography/MapServer/WMSServer',
-                layers : 'Australian_Bathymetry_Topography'
-            }),
-            baseLayerPicker : false,*/
-            imageryProvider: imageryProvider,
-            baseLayerPicker: !defined(imageryProvider),
+            imageryProvider: gaImageryProvider,
+            baseLayerPicker : false,
+            /*imageryProvider: imageryProvider,
+             baseLayerPicker: !defined(imageryProvider),*/
             timeline: false,
             animation: false
         });
@@ -115,7 +153,7 @@ define([
 	}
     resetFlyHome(viewer);
 
-    viewer.baseLayerPicker.viewModel.selectedImagery = viewer.baseLayerPicker.viewModel.imageryProviderViewModels[8];
+	//viewer.baseLayerPicker.viewModel.selectedImagery = viewer.baseLayerPicker.viewModel.imageryProviderViewModels[8];
 
 	viewer.extend(viewerDragDropMixin);
 	viewer.extend(viewerDynamicObjectMixin);
