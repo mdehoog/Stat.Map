@@ -210,6 +210,7 @@ define([
 
 	//add credits
 	scene.frameState.creditDisplay.addDefaultCredit(new Credit('ABS', 'img/abs_credit.png', 'http://stat.abs.gov.au/'));
+	scene.frameState.creditDisplay.addDefaultCredit(new Credit('Geoscience Australia', 'img/ga_credit.png', 'http://www.ga.gov.au/'));
 	scene.frameState.creditDisplay.addDefaultCredit(new Credit('GovHack', 'img/govhack_credit.png', 'http://govhack.org/'));
 	scene.frameState.creditDisplay.addDefaultCredit(new Credit('GitHub repo', 'img/github_credit.png', 'https://github.com/mdehoog/Stat.Map'));
 
