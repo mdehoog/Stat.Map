@@ -17,6 +17,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
@@ -37,7 +39,17 @@ public class Harvester
 	private final static String REGION_CONCEPT_ID = "REGION";
 	private final static String REGION_TYPE_CONCEPT_ID = "REGIONTYPE";
 	private final static String SA2_REGION_TYPE_CODE = "SA2";
-	private final static int PROCESSING_THREAD_COUNT = 5;
+	private final static int PROCESSING_THREAD_COUNT = 1;
+	@SuppressWarnings("serial")
+	private final static Set<String> UNITS_TO_IGNORE = new HashSet<String>()
+	{
+		{
+			add("no.");
+			add("no");
+			add("number");
+			add("#");
+		}
+	};
 
 	public static class Dataset
 	{
@@ -86,15 +98,17 @@ public class Harvester
 		public final Concept concept;
 		public final String id;
 		public final String description;
+		public final String units;
 		public final String parentId;
 		public Code parent;
 		public final List<Code> children = new ArrayList<>();
 
-		public Code(Concept concept, String id, String description, String parentId)
+		public Code(Concept concept, String id, String description, String units, String parentId)
 		{
 			this.concept = concept;
 			this.id = id;
 			this.description = description;
+			this.units = units;
 			this.parentId = parentId;
 		}
 
@@ -107,6 +121,7 @@ public class Harvester
 
 	public static class Data
 	{
+		public final Code code;
 		public final Concept childConcept;
 		public final DataValues values;
 		public final List<Code> codes = new ArrayList<>();
@@ -114,8 +129,9 @@ public class Harvester
 		public double min = Double.MAX_VALUE;
 		public double max = -Double.MAX_VALUE;
 
-		public Data(Concept childConcept, DataValues values)
+		public Data(Code code, Concept childConcept, DataValues values)
 		{
+			this.code = code;
 			this.childConcept = childConcept;
 			this.values = values;
 		}
@@ -130,6 +146,7 @@ public class Harvester
 	public static void main(String[] args) throws IOException, ParseException
 	{
 		File rootDir = new File("downloaded");
+		File processedDirectory = new File(rootDir, "processed");
 		Writer errorWriter = new FileWriter(new File(rootDir, "errors.txt"));
 
 		System.out.println("Loading datasets");
@@ -197,7 +214,22 @@ public class Harvester
 					}
 					String parentId = (String) codeJson.get("parentCode");
 					String codeDescription = (String) codeJson.get("description");
-					Code code = new Code(concept, codeId, codeDescription, parentId);
+					codeDescription = codeDescription.replace("\\", ""); //remove any escaping backslashes
+					codeDescription = codeDescription.replaceAll("\\s+", " ").trim(); //remove any double spaces
+					String units = null;
+					Pattern unitsPattern = Pattern.compile(".*?(\\s*\\((.+)\\)).*");
+					Matcher matcher = unitsPattern.matcher(codeDescription);
+					if (matcher.matches())
+					{
+						codeDescription = codeDescription.substring(0, matcher.start(1))
+								+ codeDescription.substring(matcher.end(1));
+						units = matcher.group(2).trim();
+						if (UNITS_TO_IGNORE.contains(units.toLowerCase()))
+						{
+							units = null;
+						}
+					}
+					Code code = new Code(concept, codeId, codeDescription, units, parentId);
 					concept.codes.add(code);
 					concept.allCodesMap.put(codeId, code);
 				}
@@ -239,7 +271,7 @@ public class Harvester
 						Dataset dataset = datasets.get(index);
 						try
 						{
-							processDataset(dataset, rootDir, errorWriter);
+							processDataset(dataset, rootDir, processedDirectory, errorWriter);
 						}
 						catch (Exception e)
 						{
@@ -274,27 +306,35 @@ public class Harvester
 
 		errorWriter.close();
 
+		saveDatasetSummary(datasets, new File(processedDirectory, "datasets.json"));
+
 		System.out.println("Done");
 	}
 
-	private static void processDataset(Dataset dataset, File rootDir, Writer errorWriter) throws IOException
+	private static void processDataset(Dataset dataset, File rootDir, File processedDirectory, Writer errorWriter)
+			throws IOException
 	{
-		File processedDirectory = new File(rootDir, "processed/" + dataset.id);
-		File summaryFile = new File(processedDirectory, "summary.json");
+		File processedDatasetDirectory = new File(processedDirectory, dataset.id);
+		File summaryFile = new File(processedDatasetDirectory, "summary.json");
 
 		if (summaryFile.exists() && !OVERWRITE_PROCESSED)
 		{
 			return;
 		}
 
-		/*if (!"ABS_NRP9_ASGS".equals(dataset.id))
+		if (dataset.id.startsWith("ABS_CENSUS2011_B"))
 		{
-			continue;
-		}*/
-		/*if (dataset.id.startsWith("ABS_CENSUS2011_B"))
+			//only ABS_CENSUS2011_B01, ABS_CENSUS2011_B02, and ABS_CENSUS2011_B03 seem to work
+			if (!(dataset.id.endsWith("01") || dataset.id.endsWith("02")/* || dataset.id.endsWith("03")*/))
+			{
+				return;
+			}
+		}
+		if (dataset.id.equals("ABS_ANNUAL_ERP_ASGS"))
 		{
+			//ABS_ANNUAL_ERP_ASGS doesn't work
 			return;
-		}*/
+		}
 
 		System.out.println("Processing data for dataset '" + dataset.id + "'");
 
@@ -334,7 +374,7 @@ public class Harvester
 		conceptString = conceptString.length() < 2 ? conceptString : conceptString.substring(2);
 		System.out.println("Found " + sum + " observation(s) per region, with concepts: " + conceptString);
 
-		Data rootData = new Data(combinationConcepts.get(0), null);
+		Data rootData = new Data(null, combinationConcepts.get(0), null);
 
 		//5 levels to download:
 		//AUS: http://stat.abs.gov.au/itt/query.jsp?method=GetGenericData&datasetid=ABS_NRP9_ASGS&and=REGION.0
@@ -369,7 +409,7 @@ public class Harvester
 
 				JSONObject data = null;
 				JSONArray series = null;
-				int retries = 5;
+				int retries = 2;
 				for (int retry = 0; retry < retries; retry++)
 				{
 					if (retry > 0)
@@ -452,7 +492,7 @@ public class Harvester
 
 		System.out.println("Saving processed data for dataset '" + dataset.id + "'");
 
-		saveData(rootData, processedDirectory, combinationConcepts.get(combinationConcepts.size() - 1));
+		saveData(rootData, processedDatasetDirectory, combinationConcepts.get(combinationConcepts.size() - 1));
 		saveSummary(dataset, summaryFile, combinationConcepts);
 	}
 
@@ -546,7 +586,7 @@ public class Harvester
 		{
 			//last one, insert values
 			assertTrue(data == null, "Already a data value for " + code.id);
-			data = new Data(null, values);
+			data = new Data(code, null, values);
 			into.codes.add(code);
 			into.data.put(code, data);
 		}
@@ -554,7 +594,7 @@ public class Harvester
 		{
 			if (data == null)
 			{
-				data = new Data(combinationConcepts.get(conceptIndex + 1), null);
+				data = new Data(code, combinationConcepts.get(conceptIndex + 1), null);
 				into.codes.add(code);
 				into.data.put(code, data);
 			}
@@ -610,7 +650,8 @@ public class Harvester
 
 		Map<String, Object> json = new HashMap<>();
 
-		json.put("c", data.childConcept.id);
+		json.put("concept", data.childConcept.id); //should always be "REGION"
+		json.put("units", data.code.units);
 		json.put("min", (Double) data.min);
 		json.put("max", (Double) data.max);
 
@@ -619,9 +660,9 @@ public class Harvester
 		{
 			timeArray.add(tryConvertToNumber(time));
 		}
-		json.put("t", timeArray);
+		json.put("times", timeArray);
 
-		JSONArray dataArray = new JSONArray();
+		Map<String, Object> dataJson = new HashMap<>();
 		for (Code code : data.codes)
 		{
 			Data child = data.data.get(code);
@@ -644,21 +685,15 @@ public class Harvester
 				continue;
 			}
 
-			Map<String, Object> dataJson = new HashMap<>();
-
-			dataJson.put("k", tryConvertToNumber(code.id));
-
 			JSONArray valueArray = new JSONArray();
 			for (String time : times)
 			{
 				String value = values.values.get(time);
 				valueArray.add(tryConvertToNumber(value));
 			}
-			dataJson.put("v", valueArray);
-
-			dataArray.add(new JSONObject(dataJson));
+			dataJson.put(code.id, valueArray);
 		}
-		json.put("d", dataArray);
+		json.put("data", new JSONObject(dataJson));
 
 		return new JSONObject(json);
 	}
@@ -696,6 +731,7 @@ public class Harvester
 
 				codeJson.put("k", code.id);
 				codeJson.put("v", code.description);
+				codeJson.put("u", code.units);
 
 				codesArray.add(new JSONObject(codeJson));
 			}
@@ -704,6 +740,28 @@ public class Harvester
 			conceptArray.add(new JSONObject(conceptJson));
 		}
 		json.put("concepts", conceptArray);
+
+		JSONObject jsonObject = new JSONObject(json);
+		try (FileWriter writer = new FileWriter(file))
+		{
+			jsonObject.writeJSONString(writer);
+		}
+	}
+
+	@SuppressWarnings("unchecked")
+	private static void saveDatasetSummary(List<Dataset> datasets, File file) throws IOException
+	{
+		Map<String, Object> json = new HashMap<>();
+
+		JSONArray datasetsArray = new JSONArray();
+		for (Dataset dataset : datasets)
+		{
+			Map<String, Object> datasetJson = new HashMap<>();
+			datasetJson.put("k", dataset.id);
+			datasetJson.put("v", dataset.description);
+			datasetsArray.add(new JSONObject(datasetJson));
+		}
+		json.put("datasets", datasetsArray);
 
 		JSONObject jsonObject = new JSONObject(json);
 		try (FileWriter writer = new FileWriter(file))
