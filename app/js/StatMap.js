@@ -135,10 +135,10 @@ define([
 	var viewer;
 	try {
 		viewer = new Viewer('cesiumContainer', {
-            imageryProvider: gaImageryProvider,
-            baseLayerPicker : false,
-            /*imageryProvider: imageryProvider,
-             baseLayerPicker: !defined(imageryProvider),*/
+            /*imageryProvider: gaImageryProvider,
+            baseLayerPicker : false,*/
+            imageryProvider: imageryProvider,
+            baseLayerPicker: !defined(imageryProvider),
             timeline: false,
             animation: false
         });
@@ -152,8 +152,13 @@ define([
 		return;
 	}
     resetFlyHome(viewer);
+    var scene = viewer.scene;
 
-	//viewer.baseLayerPicker.viewModel.selectedImagery = viewer.baseLayerPicker.viewModel.imageryProviderViewModels[8];
+	viewer.baseLayerPicker.viewModel.selectedImagery = viewer.baseLayerPicker.viewModel.imageryProviderViewModels[8];
+    var layers = scene.imageryLayers;
+    gaImageryProvider.alpha = 0.5;
+    gaImageryProvider.defaultAlpha = 0.5;
+    layers.addImageryProvider(gaImageryProvider);
 
 	viewer.extend(viewerDragDropMixin);
 	viewer.extend(viewerDynamicObjectMixin);
@@ -171,7 +176,6 @@ define([
 		showLoadError(name, error);
 	});
 
-	var scene = viewer.scene;
 	var context = scene.context;
 	if (endUserOptions.debug) {
 		context.validateShaderProgram = true;
