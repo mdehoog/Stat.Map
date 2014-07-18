@@ -11,6 +11,7 @@ import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -217,16 +218,19 @@ public class Harvester
 					codeDescription = codeDescription.replace("\\", ""); //remove any escaping backslashes
 					codeDescription = codeDescription.replaceAll("\\s+", " ").trim(); //remove any double spaces
 					String units = null;
-					Pattern unitsPattern = Pattern.compile(".*?(\\s*\\((.+)\\)).*");
-					Matcher matcher = unitsPattern.matcher(codeDescription);
-					if (matcher.matches())
+					if (!(REGION_CONCEPT_ID.equals(conceptId) || REGION_TYPE_CONCEPT_ID.equals(conceptId)))
 					{
-						codeDescription = codeDescription.substring(0, matcher.start(1))
-								+ codeDescription.substring(matcher.end(1));
-						units = matcher.group(2).trim();
-						if (UNITS_TO_IGNORE.contains(units.toLowerCase()))
+						Pattern unitsPattern = Pattern.compile(".*?(\\s*\\(([^\\(^\\)]+)\\))[^\\(^\\)]*");
+						Matcher matcher = unitsPattern.matcher(codeDescription);
+						if (matcher.matches())
 						{
-							units = null;
+							codeDescription = codeDescription.substring(0, matcher.start(1))
+									+ codeDescription.substring(matcher.end(1));
+							units = matcher.group(2).trim();
+							if (UNITS_TO_IGNORE.contains(units.toLowerCase()) || units.matches("\\d.*"))
+							{
+								units = null;
+							}
 						}
 					}
 					Code code = new Code(concept, codeId, codeDescription, units, parentId);
@@ -718,8 +722,18 @@ public class Harvester
 			Map<String, Object> conceptJson = new HashMap<>();
 			conceptJson.put("name", concept.id);
 
+			List<Code> sortedCodes = new ArrayList<>(concept.codes);
+			Collections.sort(sortedCodes, new Comparator<Code>()
+			{
+				@Override
+				public int compare(Code o1, Code o2)
+				{
+					return o1.description.compareTo(o2.description);
+				}
+			});
+
 			JSONArray codesArray = new JSONArray();
-			for (Code code : concept.codes)
+			for (Code code : sortedCodes)
 			{
 				if (!concept.usedCodes.contains(code))
 				{
@@ -753,8 +767,18 @@ public class Harvester
 	{
 		Map<String, Object> json = new HashMap<>();
 
+		List<Dataset> sortedDatasets = new ArrayList<>();
+		Collections.sort(sortedDatasets, new Comparator<Dataset>()
+		{
+			@Override
+			public int compare(Dataset o1, Dataset o2)
+			{
+				return o1.description.compareTo(o2.description);
+			}
+		});
+
 		JSONArray datasetsArray = new JSONArray();
-		for (Dataset dataset : datasets)
+		for (Dataset dataset : sortedDatasets)
 		{
 			Map<String, Object> datasetJson = new HashMap<>();
 			datasetJson.put("k", dataset.id);
