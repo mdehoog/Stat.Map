@@ -6,6 +6,7 @@ define([
     'Core/ShowGeometryInstanceAttribute',
     'Core/GeometryInstanceAttribute',
     'Core/Math',
+    'Core/JulianDate',
     'Core/ComponentDatatype',
     'Core/defineProperties',
     'Core/Color',
@@ -18,7 +19,8 @@ define([
     'ThirdParty/when',
     'StatMap/GeoJsonDataSourceWithHoles',
     'StatMap/BoundaryGeometry',
-    'StatMap/BoundaryAppearance'
+    'StatMap/BoundaryAppearance',
+    'StatMap/UniformMaterial'
 ], function(
     GeometryInstance,
     Matrix4,
@@ -26,6 +28,7 @@ define([
     ShowGeometryInstanceAttribute,
     GeometryInstanceAttribute,
     CesiumMath,
+    JulianDate,
     ComponentDatatype,
     defineProperties,
     Color,
@@ -38,7 +41,8 @@ define([
     when,
     GeoJsonDataSourceWithHoles,
     BoundaryGeometry,
-    BoundaryAppearance) {
+    BoundaryAppearance,
+    UniformMaterial) {
     "use strict";
 
     var DataLoader = function(scene) {
@@ -49,6 +53,10 @@ define([
         this._statisticsDirty = false;
         this._boundaryLevel = -1;
         this._desiredBoundaryLevel = 0;
+        this._switch = false;
+        this._switchUp = true;
+        this._switchTime = 1.0;
+        this._switchStart = JulianDate.fromDate(new Date());
     };
 
     defineProperties(DataLoader.prototype, {
@@ -159,6 +167,8 @@ define([
 		closed: false,
 		flat: false
 	});
+    boundaryAppearance.material = new UniformMaterial();
+    boundaryAppearance.material.setUniform('heightMorph', 0);
 
     DataLoader.prototype.refreshBoundaries = function() {
         var level = this._desiredBoundaryLevel;
@@ -185,8 +195,13 @@ define([
                 //geometry : GeometryPipeline.toWireframe(geometry.geometry),
                 modelMatrix: Matrix4.IDENTITY,
                 attributes: {
-                    color: ColorGeometryInstanceAttribute.fromColor(Color.WHITE),
-                    height: new GeometryInstanceAttribute({
+                    height1: new GeometryInstanceAttribute({
+                        componentDatatype: ComponentDatatype.FLOAT,
+                        componentsPerAttribute: 1,
+                        normalize: false,
+                        value: [0]
+                    }),
+                    height2: new GeometryInstanceAttribute({
                         componentDatatype: ComponentDatatype.FLOAT,
                         componentsPerAttribute: 1,
                         normalize: false,
@@ -266,16 +281,10 @@ define([
             var primitiveId = primitiveIds[i];
             var attributes = primitive.getGeometryInstanceAttributes(primitiveId);
             if(defined(attributes)) {
-                attributes.height = [valueNormalized];
-                var color = value == null ? Color.WHITE : Color.fromHsl((1.0 - valueNormalized) * 0.6666, 1.0, 0.5);
-                attributes.color = new Uint8Array([
-                    Color.floatToByte(color.red),
-                    Color.floatToByte(color.green),
-                    Color.floatToByte(color.blue),
-                    Color.floatToByte(color.alpha)
-                ]);
+                attributes[this._switchUp ? 'height1' : 'height2'] = [valueNormalized];
             }
         }
+        this._switch = true;
 
         var units = json['units'];
         units = units != null ? ' (' + units + ')' : '';
@@ -290,6 +299,17 @@ define([
     DataLoader.prototype.update = function(clock) {
         this.refreshBoundaries();
         this.refreshStatistics();
+
+        if(this._switch) {
+            this._switchStart = clock.currentTime;
+            this._switch = false;
+            this._switchUp = !this._switchUp;
+        }
+        var secondsPassed = JulianDate.getSecondsDifference(clock.currentTime, this._switchStart);
+        var percent = Math.max(0, Math.min(1, secondsPassed / this._switchTime));
+        percent = Math.sin(percent * Math.PI * 0.5);
+        var heightMorph = this._switchUp ? percent : 1.0 - percent;
+        boundaryAppearance.material.setUniform('heightMorph', heightMorph);
     };
 
     return DataLoader;
