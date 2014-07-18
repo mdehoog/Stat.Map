@@ -276,6 +276,15 @@ define([
                 ]);
             }
         }
+
+        var units = json['units'];
+        units = units != null ? ' (' + units + ')' : '';
+        var legendElement = document.getElementById('legend');
+        var legendTopElement = document.getElementById('legendtop');
+        var legendBottomElement = document.getElementById('legendbottom');
+        legendElement.style.display = 'block';
+        legendTopElement.innerHTML = max + units;
+        legendBottomElement.innerHTML = min + units;
     };
 
     DataLoader.prototype.update = function(clock) {

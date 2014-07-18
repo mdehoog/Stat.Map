@@ -43,6 +43,30 @@ body {
     left: 10px;
 }
 
+#legend {
+    display: none;
+    position: absolute;
+    bottom: 30px;
+    right: 3px;
+}
+
+.legendtext {
+    display: block;
+    position: absolute;
+    text-align: right;
+    width: 100%;
+    color: white;
+    right: 36px;
+}
+
+#legendtop {
+    bottom: 178px;
+}
+
+#legendbottom {
+    bottom: 27px;
+}
+
 #datasetSelect {
     display: block;
     position: absolute;
