@@ -57,6 +57,7 @@ define([
         this._switchUp = true;
         this._switchTime = 1.0;
         this._switchStart = JulianDate.fromDate(new Date());
+        this._regionNames = {};
     };
 
     defineProperties(DataLoader.prototype, {
@@ -95,6 +96,7 @@ define([
             var objectIdSet = {};
             var objects = dataSource.dynamicObjects._objects._array;
             var cleaned = [];
+            var names = {};
 
             for (var i = 0; i < objects.length; i++) {
                 var object = objects[i];
@@ -136,6 +138,7 @@ define([
                 }
 
                 cleaned.push(clean);
+                that._regionNames[objectId] = object.name;
             }
 
             var geometries = [];
@@ -292,7 +295,7 @@ define([
         }
         this._switch = true;
 
-        var units = json['units'];
+        var units = this.getUnits();
         units = units != null ? ' (' + units + ')' : '';
         var legendElement = document.getElementById('legend');
         var legendTopElement = document.getElementById('legendtop');
@@ -301,6 +304,32 @@ define([
         legendTopElement.innerHTML = max + units;
         legendBottomElement.innerHTML = min + units;
     };
+
+    DataLoader.prototype.getUnits = function(id) {
+        if(!defined(this._statisticsJson)) {
+            return undefined;
+        }
+        return this._statisticsJson['units'];
+    }
+
+    DataLoader.prototype.getValue = function(id) {
+        if(!defined(this._statisticsJson)) {
+            return undefined;
+        }
+
+        var json = this._statisticsJson;
+        var data = json['data'];
+        var times = json['times'];
+
+        var dataIndex = times.length - 1; //use latest figures by default
+        var dataValues = data[id];
+        if(!defined(dataValues)) {
+            return undefined;
+        }
+
+        var value = dataValues[dataIndex];
+        return value;
+    }
 
     DataLoader.prototype.setSelected = function(id) {
         var primitive = this._primitive;
@@ -320,6 +349,10 @@ define([
             }
         }
         this._selectedId = id;
+    };
+
+    DataLoader.prototype.getName = function(id) {
+        return this._regionNames[id];
     };
 
     DataLoader.prototype.update = function(clock) {

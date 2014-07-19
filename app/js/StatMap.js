@@ -205,11 +205,21 @@ define([
     var handler = new Cesium.ScreenSpaceEventHandler(scene.canvas);
     handler.setInputAction(function (movement) {
         var pickedObject = scene.pick(movement.endPosition);
+        var annotation = document.getElementById('annotation');
         if (defined(pickedObject) && defined(pickedObject.id)) {
             var instanceId = pickedObject.id;
             dataLoader.setSelected(instanceId);
+            var name = dataLoader.getName(instanceId);
+            var value = dataLoader.getValue(instanceId);
+            var units = dataLoader.getUnits();
+            units = units != null ? ' (' + units + ')' : '';
+            annotation.innerHTML = 'Region: <b>' + name + '</b><br/>Value: <b>' + value + '</b>' + units;
+            annotation.style.left = (movement.endPosition.x + 10) + 'px';
+            annotation.style.top = (movement.endPosition.y + 10) + 'px';
+            annotation.style.display = '';
         } else {
             dataLoader.setSelected();
+            annotation.style.display = 'none';
         }
     }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
 
