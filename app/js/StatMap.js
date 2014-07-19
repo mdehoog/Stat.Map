@@ -96,7 +96,7 @@ define([
 	}*/
 
 	var gaImageryProvider = new CustomTileMapServiceImageryProvider({
-		url: 'http://www.ga.gov.au/apps/world-wind/tiles.jsp?T=terrain/ausbath09_nw',
+		url: '//www.ga.gov.au/apps/world-wind/tiles.jsp?T=terrain/ausbath09_nw',
 		rectangle: new Cesium.Rectangle(
 			Cesium.Math.toRadians(91.9987499999936),
 			Cesium.Math.toRadians(-59.998749998960086),
