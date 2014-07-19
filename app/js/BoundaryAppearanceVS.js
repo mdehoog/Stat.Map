@@ -26,7 +26,7 @@ vec3 hue(float value)\n\
     {\n\
         g = 4.0 - g;\n\
     }\n\
-    return vec3(r, g, b);\n\
+    return clamp(vec3(r, g, b), 0.0, 1.0);\n\
 }\n\
 \n\
 void main()\n\
