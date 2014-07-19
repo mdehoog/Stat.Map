@@ -124,7 +124,7 @@ of the world.\nhttp://www.openstreetmap.org',
 area washes and organic edges over a paper texture to add warm pop to any map.\nhttp://maps.stamen.com',
             creationFunction : function() {
                 return new OpenStreetMapImageryProvider({
-                    url : '//a.tile.stamen.com/watercolor/',
+                    url : '//stamen-tiles.a.ssl.fastly.net/watercolor/',
                     credit : 'Map tiles by Stamen Design, under CC BY 3.0. Data by OpenStreetMap, under CC BY SA.'
                 });
             }
@@ -136,7 +136,7 @@ area washes and organic edges over a paper texture to add warm pop to any map.\n
             tooltip : 'A high contrast black and white map.\nhttp://maps.stamen.com',
             creationFunction : function() {
                 return new OpenStreetMapImageryProvider({
-                    url : '//a.tile.stamen.com/toner/',
+                    url : '//stamen-tiles.a.ssl.fastly.net/toner/',
                     credit : 'Map tiles by Stamen Design, under CC BY 3.0. Data by OpenStreetMap, under CC BY SA.'
                 });
             }
