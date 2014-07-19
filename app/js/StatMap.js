@@ -205,9 +205,11 @@ define([
     var handler = new Cesium.ScreenSpaceEventHandler(scene.canvas);
     handler.setInputAction(function (movement) {
         var pickedObject = scene.pick(movement.endPosition);
-        if (defined(pickedObject)) {
-            //console.log(pickedObject.primitive);
-            //TODO do something with the picked ASGS (like show a popup/tooltip)
+        if (defined(pickedObject) && defined(pickedObject.id)) {
+            var instanceId = pickedObject.id;
+            dataLoader.setSelected(instanceId);
+        } else {
+            dataLoader.setSelected();
         }
     }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
 

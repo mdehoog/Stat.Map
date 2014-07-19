@@ -206,6 +206,12 @@ define([
                         componentsPerAttribute: 1,
                         normalize: false,
                         value: [0]
+                    }),
+                    selected: new GeometryInstanceAttribute({
+                        componentDatatype: ComponentDatatype.FLOAT,
+                        componentsPerAttribute: 1,
+                        normalize: false,
+                        value: [0]
                     })
                 }
             });
@@ -294,6 +300,26 @@ define([
         legendElement.style.display = 'block';
         legendTopElement.innerHTML = max + units;
         legendBottomElement.innerHTML = min + units;
+    };
+
+    DataLoader.prototype.setSelected = function(id) {
+        var primitive = this._primitive;
+        if(!(defined(primitive) && defined(primitive._perInstanceAttributeLocations))) {
+            return;
+        }
+        if(defined(this._selectedId)) {
+            var attributes = primitive.getGeometryInstanceAttributes(this._selectedId);
+            if(defined(attributes)) {
+                attributes.selected = [0];
+            }
+        }
+        if(defined(id)) {
+            var attributes = primitive.getGeometryInstanceAttributes(id);
+            if (defined(attributes)) {
+                attributes.selected = [1];
+            }
+        }
+        this._selectedId = id;
     };
 
     DataLoader.prototype.update = function(clock) {

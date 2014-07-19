@@ -6,6 +6,7 @@ attribute vec3 position3DLow;\n\
 attribute vec3 normal;\n\
 attribute float height1;\n\
 attribute float height2;\n\
+attribute float selected;\n\
 \n\
 uniform float heightMorph;\n\
 \n\
@@ -48,7 +49,7 @@ void main()\n\
     \n\
     v_positionEC = p.xyz;\n\
     v_normalEC = czm_normal * normal;\n\
-    v_color = vec4(hue(1.0 - height), 1.0);\n\
+    v_color = vec4(max(hue(1.0 - height), vec3(selected)), 1.0);\n\
     \n\
     gl_Position = czm_projection * p * visible;\n\
 }\n\
